@@ -60,5 +60,5 @@ jobs:
           app-name: 'my-cicd-webapp-2025'
           slot-name: 'Production'
           # CRITICAL FIX: The package is located inside the 'webapp-artifact' folder 
-          # which is at the root of the runner's workspace (${{ github.workspace }}).
-          package: '${{ github.workspace }}/webapp-artifact/'
+          # We use the folder name directly for better path resolution on Windows.
+          package: 'webapp-artifact'
