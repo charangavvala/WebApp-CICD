@@ -1,17 +1,13 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Deploy Static HTML to App Service - my-cicd-webapp-2025
+name: Deploy Static HTML (Zip Fix) to App Service - my-cicd-webapp-2025
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
-
-env:
-  # Base directory for the GitHub Actions runner (retained for clarity)
-  AZURE_WEBAPP_PACKAGE_PATH: '.' 
 
 jobs:
   build:
@@ -23,14 +19,13 @@ jobs:
       - name: 'Checkout GitHub Action'
         uses: actions/checkout@v4
 
-      # --- This space intentionally left blank (removed Node.js setup) ---
-
-      # 1. UPLOAD: The HTML file is the artifact itself, located at the root of the repository
-      - name: Upload artifact for deployment job
+      # New Step: Archive the files to create a deployable package
+      - name: Archive Files
         uses: actions/upload-artifact@v4
         with:
-          name: webapp-artifact # This is the name of the folder created on download
+          name: webapp-artifact
           path: .
+          # We don't zip it here, we just upload the folder content
 
   deploy:
     runs-on: windows-latest
@@ -40,11 +35,13 @@ jobs:
       contents: read
 
     steps:
-      # 2. DOWNLOAD: The artifact is downloaded into a new folder named 'webapp-artifact'
-      - name: Download artifact from build job
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: webapp-artifact 
+          name: webapp-artifact
+          # CRITICAL CHANGE: Download the artifact contents directly to the root of the workspace.
+          # This should place index.html directly in ${{ github.workspace }}/
+          path: ${{ github.workspace }}
           
       - name: Login to Azure
         uses: azure/login@v2
@@ -53,12 +50,12 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2BC18C3D16DC49C29D3F32EF4A362958 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_4CB561F10B1A40558DE1080634352623 }}
 
-      # 3. DEPLOY: Point the package path directly to the downloaded artifact folder
+      # Deploying the entire current workspace which now contains index.html
       - name: 'Deploy to Azure WebApp'
         uses: azure/webapps-deploy@v2 
         with:
           app-name: 'my-cicd-webapp-2025'
           slot-name: 'Production'
-          # CRITICAL FIX: The package is located inside the 'webapp-artifact' folder 
-          # We use the folder name directly for better path resolution on Windows.
-          package: 'webapp-artifact'
+          # CRITICAL FIX: The entire workspace (${{ github.workspace }}) is now the package.
+          # This is the last and most direct path reference.
+          package: '${{ github.workspace }}'
