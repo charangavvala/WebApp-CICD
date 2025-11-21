@@ -10,53 +10,55 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_PACKAGE_PATH: '.' # Use the repository root, where index.html is located
-  # Removed NODE_VERSION as it is no longer needed
+  # Base directory for the GitHub Actions runner (retained for clarity)
+  AZURE_WEBAPP_PACKAGE_PATH: '.' 
 
 jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: read #This is required for actions/checkout
+      contents: read
       
     steps:
       - name: 'Checkout GitHub Action'
         uses: actions/checkout@v4
 
-      # --- REMOVED: Node.js Setup and npm install step (not needed for static HTML) ---
-      
-      # The HTML file is the artifact itself, located at the root (path: .)
+      # --- This space intentionally left blank (removed Node.js setup) ---
+
+      # 1. UPLOAD: The HTML file is the artifact itself, located at the root of the repository
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
-          name: webapp-artifact # Changed artifact name for clarity
+          name: webapp-artifact # This is the name of the folder created on download
           path: .
 
   deploy:
     runs-on: windows-latest
     needs: build
     permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      id-token: write
+      contents: read
 
     steps:
+      # 2. DOWNLOAD: The artifact is downloaded into a new folder named 'webapp-artifact'
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
-          name: webapp-artifact # Use the new artifact name
+          name: webapp-artifact 
           
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          # Use your existing secrets here
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_0578A9EB5AF24CA0BC173057972FE209 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2BC18C3D16DC49C29D3F32EF4A362958 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_4CB561F10B1A40558DE1080634352623 }}
 
+      # 3. DEPLOY: Point the package path directly to the downloaded artifact folder
       - name: 'Deploy to Azure WebApp'
-        uses: azure/webapps-deploy@v2 # CORRECT ACTION for Azure App Service (Web App)
+        uses: azure/webapps-deploy@v2 
         with:
           app-name: 'my-cicd-webapp-2025'
           slot-name: 'Production'
-          # Deploy the downloaded artifact folder
-          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+          # CRITICAL FIX: The package is located inside the 'webapp-artifact' folder 
+          # which is at the root of the runner's workspace (${{ github.workspace }}).
+          package: '${{ github.workspace }}/webapp-artifact/'
